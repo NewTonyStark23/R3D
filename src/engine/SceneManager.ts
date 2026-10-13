@@ -172,7 +172,7 @@ export class SceneManager {
   // Add cloth simulation mesh to scene
   addCloth(cloth: any) {
     const mesh = cloth.getMesh();
-    mesh.position.set(0, 1.0, -0.3); // Position behind character (cape)
+    mesh.position.set(0, 1.0, -0.3);
     this.scene.add(mesh);
   }
 
@@ -180,6 +180,21 @@ export class SceneManager {
   removeCloth(cloth: any) {
     const mesh = cloth.getMesh();
     this.scene.remove(mesh);
+  }
+
+  // Toggle wireframe rendering
+  toggleWireframe(enabled: boolean) {
+    if (this.characterMesh) {
+      const mat = this.characterMesh.material as THREE.MeshStandardMaterial;
+      mat.wireframe = enabled;
+    }
+  }
+
+  // Reset camera to default position
+  resetCamera() {
+    this.camera.position.set(0, 0.5, 3);
+    this.controls.target.set(0, 0.5, 0);
+    this.controls.update();
   }
 
   toggleSkeletonVisibility() {
