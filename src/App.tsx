@@ -1,10 +1,12 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
+import * as THREE from 'three';
 import { SceneManager } from './engine/SceneManager';
 import { DepthEngine } from './engine/DepthEngine';
 import { MeshGenerator } from './engine/MeshGenerator';
 import { SkeletonSystem } from './engine/SkeletonSystem';
 import { AIController } from './engine/AIController';
 import { ResourceManager } from './engine/ResourceManager';
+import { ClothPhysics, RagdollPhysics } from './engine/PhysicsEngine';
 import { Viewport } from './components/Viewport';
 import { ControlPanel } from './components/ControlPanel';
 import { DepthView } from './components/DepthView';
@@ -23,6 +25,9 @@ export interface SystemState {
   skeletonReady: boolean;
   aiActive: boolean;
   originalImage: string | null;
+  physicsActive: boolean;
+  clothActive: boolean;
+  windStrength: number;
 }
 
 function App() {
@@ -33,6 +38,8 @@ function App() {
   const skeletonRef = useRef<SkeletonSystem | null>(null);
   const aiControllerRef = useRef<AIController | null>(null);
   const resourceMgrRef = useRef<ResourceManager | null>(null);
+  const clothRef = useRef<ClothPhysics | null>(null);
+  const ragdollRef = useRef<RagdollPhysics | null>(null);
 
   const [state, setState] = useState<SystemState>({
     stage: 'idle',
@@ -45,6 +52,9 @@ function App() {
     skeletonReady: false,
     aiActive: false,
     originalImage: null,
+    physicsActive: false,
+    clothActive: false,
+    windStrength: 0.5,
   });
 
   const [logs, setLogs] = useState<string[]>([]);
@@ -79,10 +89,14 @@ function App() {
     const aiCtrl = new AIController(skeleton, scene);
     aiControllerRef.current = aiCtrl;
 
+    const ragdoll = new RagdollPhysics();
+    ragdollRef.current = ragdoll;
+
     addLog('System initialized. Engines ready.');
     addLog('GPU Target: 2GB | RAM Target: 4GB | FPS Target: 30');
+    addLog('Physics: Verlet cloth + Ragdoll ready');
 
-    // Resource monitoring loop
+    // Resource monitoring + physics simulation loop
     const monitorInterval = setInterval(() => {
       const stats = resourceMgr.getStats();
       setState(prev => ({
@@ -91,7 +105,17 @@ function App() {
         memUsage: stats.memUsage,
         fps: stats.fps,
       }));
-    }, 1000);
+
+      // Update cloth physics if active
+      if (clothRef.current) {
+        clothRef.current.simulate(0.016);
+      }
+
+      // Update ragdoll physics if active
+      if (ragdollRef.current && ragdollRef.current.isActive()) {
+        ragdollRef.current.update(0.016);
+      }
+    }, 16); // ~60fps physics
 
     return () => {
       clearInterval(monitorInterval);
@@ -137,13 +161,15 @@ function App() {
 
       // Stage 4: Rig with invisible skeleton
       setState(prev => ({ ...prev, stage: 'rigging', progress: 75 }));
-      addLog('Attaching invisible skeletal rig...');
+      addLog('Attaching invisible skeletal rig (28 bones)...');
       const skeletonData = skeletonRef.current.createHumanoidRig(meshData);
       sceneRef.current.attachSkeleton(skeletonData);
       aiControllerRef.current?.setSkeleton(skeletonData);
+      ragdollRef.current?.initFromSkeleton(skeletonData);
       setState(prev => ({ ...prev, skeletonReady: true, stage: 'ready', progress: 100 }));
       addLog('✓ Skeletal rig attached. Character is alive!');
-      addLog('Use AI Controller to animate movement.');
+      addLog('AnimationMixer ready with 8 clips. AI Controller active.');
+      addLog('Physics: Ragdoll + Cloth available.');
 
     } catch (err) {
       addLog(`✗ Error: ${(err as Error).message}`);
@@ -168,6 +194,52 @@ function App() {
     if (!aiControllerRef.current) return;
     aiControllerRef.current.setMode(mode);
     addLog(`AI Mode: ${mode}`);
+  };
+
+  const togglePhysics = () => {
+    if (!ragdollRef.current) return;
+
+    const active = !state.physicsActive;
+    if (active) {
+      ragdollRef.current.activate();
+      addLog('Physics activated - ragdoll simulation running');
+    } else {
+      ragdollRef.current.deactivate();
+      addLog('Physics deactivated');
+    }
+    setState(prev => ({ ...prev, physicsActive: active }));
+  };
+
+  const toggleCloth = () => {
+    const active = !state.clothActive;
+    if (active && !clothRef.current && sceneRef.current) {
+      const cloth = new ClothPhysics({
+        width: 12,
+        height: 16,
+        particleMass: 0.1,
+        gravity: new THREE.Vector3(0, -9.81, 0),
+        wind: new THREE.Vector3(state.windStrength, 0, 0.5),
+        damping: 0.97,
+        constraintIterations: 5,
+        pinnedEdges: ['top'],
+      });
+      clothRef.current = cloth;
+      sceneRef.current.addCloth(cloth);
+      addLog('Cloth simulation activated (cape)');
+    } else if (!active && clothRef.current) {
+      sceneRef.current?.removeCloth(clothRef.current);
+      clothRef.current.dispose();
+      clothRef.current = null;
+      addLog('Cloth simulation deactivated');
+    }
+    setState(prev => ({ ...prev, clothActive: active }));
+  };
+
+  const setWindStrength = (strength: number) => {
+    setState(prev => ({ ...prev, windStrength: strength }));
+    if (clothRef.current) {
+      clothRef.current.setWind(new THREE.Vector3(strength, 0, 0.5));
+    }
   };
 
   const handleGlobalDrop = useCallback((e: React.DragEvent) => {
@@ -214,6 +286,9 @@ function App() {
           onImageUpload={handleImageUpload}
           onToggleAI={toggleAI}
           onSetAIMode={setAIMode}
+          onTogglePhysics={togglePhysics}
+          onToggleCloth={toggleCloth}
+          onSetWind={setWindStrength}
           logs={logs}
         />
 

@@ -161,6 +161,27 @@ export class SceneManager {
     }
   }
 
+  // Called by AIController when animation updates
+  notifyUpdate() {
+    // SkeletonHelper will update on next render
+    if (this.skeletonHelper) {
+      this.skeletonHelper.updateMatrixWorld();
+    }
+  }
+
+  // Add cloth simulation mesh to scene
+  addCloth(cloth: any) {
+    const mesh = cloth.getMesh();
+    mesh.position.set(0, 1.0, -0.3); // Position behind character (cape)
+    this.scene.add(mesh);
+  }
+
+  // Remove cloth simulation mesh from scene
+  removeCloth(cloth: any) {
+    const mesh = cloth.getMesh();
+    this.scene.remove(mesh);
+  }
+
   toggleSkeletonVisibility() {
     this.showSkeleton = !this.showSkeleton;
     if (this.skeletonHelper) {

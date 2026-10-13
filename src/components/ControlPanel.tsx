@@ -6,6 +6,9 @@ interface ControlPanelProps {
   onImageUpload: (file: File) => void;
   onToggleAI: () => void;
   onSetAIMode: (mode: string) => void;
+  onTogglePhysics?: () => void;
+  onToggleCloth?: () => void;
+  onSetWind?: (strength: number) => void;
   logs: string[];
 }
 
@@ -16,9 +19,11 @@ const AI_MODES = [
   { id: 'dance', label: 'Dance', icon: '💃' },
   { id: 'look_around', label: 'Look', icon: '👀' },
   { id: 'breathe', label: 'Breathe', icon: '🌬️' },
+  { id: 'jump', label: 'Jump', icon: '🦘' },
+  { id: 'fight', label: 'Fight', icon: '🥊' },
 ];
 
-export function ControlPanel({ state, onImageUpload, onToggleAI, onSetAIMode, logs }: ControlPanelProps) {
+export function ControlPanel({ state, onImageUpload, onToggleAI, onSetAIMode, onTogglePhysics, onToggleCloth, onSetWind, logs }: ControlPanelProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [activeMode, setActiveMode] = useState('idle');
   const [showLogs, setShowLogs] = useState(true);
@@ -129,7 +134,7 @@ export function ControlPanel({ state, onImageUpload, onToggleAI, onSetAIMode, lo
         </div>
 
         {state.skeletonReady ? (
-          <div className="grid grid-cols-3 gap-1">
+          <div className="grid grid-cols-4 gap-1">
             {AI_MODES.map((mode) => (
               <button
                 key={mode.id}
@@ -153,6 +158,53 @@ export function ControlPanel({ state, onImageUpload, onToggleAI, onSetAIMode, lo
         )}
       </div>
 
+      {/* Physics Section */}
+      {state.skeletonReady && (
+        <div className="p-3 border-b border-[#1a1a2e]">
+          <h3 className="text-[10px] uppercase tracking-wider text-gray-500 mb-2">
+            <i className="fas fa-atom mr-1"></i> Physics
+          </h3>
+          <div className="space-y-2">
+            <div className="flex gap-1">
+              <button
+                onClick={onTogglePhysics}
+                className={`flex-1 px-2 py-1.5 rounded text-[10px] transition-all ${
+                  state.physicsActive
+                    ? 'bg-orange-900/50 text-orange-300 border border-orange-700/50'
+                    : 'bg-[#111120] text-gray-500 border border-[#1a1a2e] hover:border-gray-600'
+                }`}
+              >
+                <i className="fas fa-person-falling mr-1"></i> Ragdoll
+              </button>
+              <button
+                onClick={onToggleCloth}
+                className={`flex-1 px-2 py-1.5 rounded text-[10px] transition-all ${
+                  state.clothActive
+                    ? 'bg-purple-900/50 text-purple-300 border border-purple-700/50'
+                    : 'bg-[#111120] text-gray-500 border border-[#1a1a2e] hover:border-gray-600'
+                }`}
+              >
+                <i className="fas fa-wind mr-1"></i> Cloth
+              </button>
+            </div>
+            {state.clothActive && (
+              <div>
+                <label className="text-[9px] text-gray-500 block mb-1">Wind: {state.windStrength.toFixed(1)}</label>
+                <input
+                  type="range"
+                  min="0"
+                  max="3"
+                  step="0.1"
+                  value={state.windStrength}
+                  onChange={(e) => onSetWind?.(parseFloat(e.target.value))}
+                  className="w-full h-1 bg-gray-800 rounded-lg appearance-none cursor-pointer accent-purple-500"
+                />
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Pipeline Status */}
       <div className="p-3 border-b border-[#1a1a2e]">
         <h3 className="text-[10px] uppercase tracking-wider text-gray-500 mb-2">
@@ -174,6 +226,10 @@ export function ControlPanel({ state, onImageUpload, onToggleAI, onSetAIMode, lo
           <PipelineStep
             label="AI Movement"
             status={state.aiActive ? 'active' : state.skeletonReady ? 'done' : 'pending'}
+          />
+          <PipelineStep
+            label="Physics Sim"
+            status={state.physicsActive || state.clothActive ? 'active' : state.skeletonReady ? 'done' : 'pending'}
           />
         </div>
       </div>

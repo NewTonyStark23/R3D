@@ -99,10 +99,10 @@ export class MeshGenerator {
     uvs: Float32Array;
     indices: Uint32Array;
   } {
-    // Scale factors
+    // Scale factors - optimized for character proportions
     const scaleX = 2.0; // Character width in world units
     const scaleY = scaleX * (height / width); // Maintain aspect ratio
-    const depthScale = 0.8; // How much depth displaces vertices
+    const depthScale = 1.2; // How much depth displaces vertices (increased for 360° feel)
 
     const vertexCount = width * height;
     const vertices = new Float32Array(vertexCount * 3);
@@ -183,15 +183,18 @@ export class MeshGenerator {
     width: number,
     height: number
   ) {
-    // Add back vertices (mirrored Z) for solid character
+    // Add back vertices (mirrored Z) for solid 360° character
     const offset = vertices.length / 3;
     const backVertices = new Float32Array(vertices.length);
     const backNormals = new Float32Array(normals.length);
+    const thickness = 0.15; // Character body thickness
 
     for (let i = 0; i < vertices.length; i += 3) {
       backVertices[i] = vertices[i];
       backVertices[i + 1] = vertices[i + 1];
-      backVertices[i + 2] = vertices[i + 2] - 0.05; // Slight offset for thickness
+      // Create depth variation for more 3D feel
+      const depth = vertices[i + 2];
+      backVertices[i + 2] = depth - thickness - (1.0 - depth) * 0.1;
       backNormals[i] = -normals[i];
       backNormals[i + 1] = -normals[i + 1];
       backNormals[i + 2] = -normals[i + 2];
